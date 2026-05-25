@@ -1,0 +1,182 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAnonymous() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function isReadOnlyUser() {
+      return isSignedIn()
+        && request.auth.token.email in [
+          'fhsvp2208@gmail.com'
+        ];
+    }
+
+    function canWrite() {
+      return isSignedIn() && !isAnonymous() && !isReadOnlyUser();
+    }
+
+    function validMedicationCategory(value) {
+      return value == 'Almacenable'
+        || value == 'Compra Local'
+        || value == 'No Definido';
+    }
+
+    function validString(value, maxLen) {
+      return value is string && value.size() > 0 && value.size() <= maxLen;
+    }
+
+    function validOptionalString(value, maxLen) {
+      return value == null || (value is string && value.size() <= maxLen);
+    }
+
+    function validPatientStatus(value) {
+      return value == null || value == 'Active' || value == 'Suspended';
+    }
+
+    function validIssuer(value) {
+      return value is string && value in ['CCF', 'CLF', 'RA'];
+    }
+
+    function validPatientsList(patients) {
+      return patients is list
+        && patients.size() <= 200;
+    }
+
+    function isMedicationDocument(data) {
+      return data.keys().hasAll(['code', 'name', 'strength', 'route', 'type', 'patients'])
+        && data.keys().hasOnly(['code', 'name', 'strength', 'route', 'type', 'category', 'patients'])
+        && validString(data.code, 40)
+        && validString(data.name, 200)
+        && validString(data.strength, 80)
+        && validString(data.route, 80)
+        && validString(data.type, 60)
+        && validPatientsList(data.patients)
+        && (
+          !data.keys().hasAny(['category'])
+          || (data.category is string && validMedicationCategory(data.category))
+        );
+    }
+
+    function isPrescriberDocument(data) {
+      return data.keys().hasAll(['name', 'specialty'])
+        && data.keys().hasOnly(['name', 'specialty'])
+        && validString(data.name, 120)
+        && validString(data.specialty, 120);
+    }
+
+    function isTransferControl(data) {
+      return data == null
+        || (
+          data is map
+          && data.keys().hasOnly(['sentDate', 'receivedDate', 'notes', 'totalUnits', 'transfers', 'pendingBalance'])
+          && (!data.keys().hasAny(['sentDate']) || validOptionalString(data.sentDate, 40))
+          && (!data.keys().hasAny(['receivedDate']) || validOptionalString(data.receivedDate, 40))
+          && (!data.keys().hasAny(['notes']) || validOptionalString(data.notes, 500))
+          && (!data.keys().hasAny(['totalUnits']) || validOptionalString(data.totalUnits, 40))
+          && (!data.keys().hasAny(['pendingBalance']) || validOptionalString(data.pendingBalance, 40))
+          && (
+            !data.keys().hasAny(['transfers'])
+            || (
+              data.transfers is list
+              && data.transfers.size() <= 100
+            )
+          )
+        );
+    }
+
+    function isPatientDocument(data) {
+      return data.keys().hasAll([
+        'id',
+        'identificationNumber',
+        'name',
+        'diagnosis',
+        'authorizationCode',
+        'issuer',
+        'startMonth',
+        'endMonth',
+        'dose',
+        'frequency',
+        'route',
+        'totalCycles',
+        'totalMonths',
+        'applicationPlace',
+        'prescriber',
+        'specialty'
+      ])
+      && data.keys().hasOnly([
+        'id',
+        'identificationNumber',
+        'name',
+        'diagnosis',
+        'authorizationCode',
+        'issuer',
+        'startMonth',
+        'endMonth',
+        'dose',
+        'frequency',
+        'route',
+        'totalCycles',
+        'totalMonths',
+        'applicationPlace',
+        'prescriber',
+        'specialty',
+        'transferControl',
+        'status',
+        'suspensionReason',
+        'suspensionNotes',
+        'suspensionDate',
+        'authorizationHistory'
+      ])
+      && data.id is int
+      && validString(data.identificationNumber, 40)
+      && validString(data.name, 180)
+      && validString(data.diagnosis, 300)
+      && validString(data.authorizationCode, 80)
+      && validIssuer(data.issuer)
+      && validString(data.startMonth, 20)
+      && validString(data.endMonth, 20)
+      && validString(data.dose, 120)
+      && validString(data.frequency, 120)
+      && validString(data.route, 80)
+      && validString(data.totalCycles, 40)
+      && validString(data.totalMonths, 40)
+      && validString(data.applicationPlace, 120)
+      && validString(data.prescriber, 180)
+      && validString(data.specialty, 120)
+      && (!data.keys().hasAny(['status']) || validPatientStatus(data.status))
+      && (!data.keys().hasAny(['suspensionReason']) || validOptionalString(data.suspensionReason, 120))
+      && (!data.keys().hasAny(['suspensionNotes']) || validOptionalString(data.suspensionNotes, 500))
+      && (!data.keys().hasAny(['suspensionDate']) || validOptionalString(data.suspensionDate, 40))
+      && (!data.keys().hasAny(['transferControl']) || isTransferControl(data.transferControl));
+    }
+
+    match /medications/{medicationId} {
+      allow read: if isSignedIn();
+      allow create, update: if canWrite() && isMedicationDocument(request.resource.data);
+      allow delete: if canWrite();
+    }
+
+    match /medications/{medicationId}/patients/{patientId} {
+      allow read: if isSignedIn();
+      allow create, update: if canWrite() && isPatientDocument(request.resource.data);
+      allow delete: if canWrite();
+    }
+
+    match /prescribers/{prescriberId} {
+      allow read: if isSignedIn();
+      allow create, update: if canWrite() && isPrescriberDocument(request.resource.data);
+      allow delete: if canWrite();
+    }
+
+    match /{document=**} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+  }
+}
