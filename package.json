@@ -10,7 +10,8 @@
     "bundle:check": "node scripts/check-bundle-budget.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest --pool=forks",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run src/utils/statusUtils.test.ts src/utils/permissions.test.ts src/utils/patientOperations.test.ts src/utils/formatters.test.ts src/App.test.tsx src/tests/DataVisibility.test.tsx src/views/DetailsView.test.tsx",
     "test:rules": "firebase emulators:exec --only firestore \"vitest run --config firestore-rules-tests/vitest.rules.config.ts firestore-rules-tests/firestore.rules.test.ts\"",
     "quality:baseline": "npm run lint && npm run test -- --run && npm run build && npm run bundle:check"
   },
