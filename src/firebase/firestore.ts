@@ -1,8 +1,4 @@
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { firebaseApp } from './app';
+import { getFirestore } from 'firebase/firestore';
 
-export const db = initializeFirestore(firebaseApp, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
-  }),
-});
+export const db = getFirestore(firebaseApp);

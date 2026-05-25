@@ -1,4 +1,6 @@
 const DEV = import.meta.env.DEV;
+const ENABLE_REMOTE_LOGS = import.meta.env.PROD;
+let remoteLogFailed = false;
 
 type LogMeta = Record<string, unknown>;
 
@@ -12,6 +14,9 @@ function emit(level: 'info' | 'warn' | 'error', message: string, meta?: LogMeta)
 
   if (level === 'error') {
     console.error(payload);
+    if (ENABLE_REMOTE_LOGS) {
+      void writeRemoteError(payload);
+    }
     return;
   }
 
@@ -22,6 +27,19 @@ function emit(level: 'info' | 'warn' | 'error', message: string, meta?: LogMeta)
 
   if (DEV) {
     console.info(payload);
+  }
+}
+
+async function writeRemoteError(payload: Record<string, unknown>): Promise<void> {
+  if (remoteLogFailed) return;
+  try {
+    const [{ db }, { addDoc, collection }] = await Promise.all([
+      import('../firebase/firestore'),
+      import('firebase/firestore'),
+    ]);
+    await addDoc(collection(db, 'ops_logs'), payload);
+  } catch {
+    remoteLogFailed = true;
   }
 }
 
