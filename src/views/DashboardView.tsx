@@ -118,14 +118,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         ))}
                     </div>
                 ) : (
-                    <VirtuosoGrid
-                        style={{ height: '100%' }}
-                        totalCount={medications.length}
-                        overscan={300}
-                        listClassName="grid grid-cols-1 md:grid-cols-2 gap-4 pb-24"
-                        itemContent={(index) => {
-                            const med = medications[index];
-                            return (
+                    medications.length <= 120 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-24">
+                            {medications.map((med) => (
                                 <div key={med.id} className="h-full">
                                     <div
                                         onClick={() => onMedClick(med)}
@@ -133,7 +128,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                     >
                                         <div className="flex flex-1">
                                             <div className={`w-1.5 ${(med.patients?.length || 0) > 0 ? 'bg-emerald-700' : 'bg-slate-200'}`} />
-
                                             <div className="p-4 flex-1 flex flex-col">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
@@ -144,15 +138,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                                         {med.patients?.length || 0} Pacientes
                                                     </div>
                                                 </div>
-
                                                 <div className="flex justify-between items-center mt-auto pt-3 border-t border-slate-100">
                                                     <div className="flex items-center gap-4 text-xs text-slate-500">
-                                                        <span className="flex items-center gap-1 font-mono text-emerald-700/80 font-medium">
-                                                            <FileText size={12} /> {med.code}
-                                                        </span>
-                                                        <span className="flex items-center gap-1">
-                                                            <Syringe size={12} /> {med.route}
-                                                        </span>
+                                                        <span className="flex items-center gap-1 font-mono text-emerald-700/80 font-medium"><FileText size={12} /> {med.code}</span>
+                                                        <span className="flex items-center gap-1"><Syringe size={12} /> {med.route}</span>
                                                         {med.category && (
                                                             <span className={`flex items-center gap-1 font-medium ${med.category === 'Almacenable' ? 'text-blue-600' : 'text-amber-600'}`}>
                                                                 {med.category === 'Almacenable' ? <Package size={12} /> : <ShoppingBag size={12} />}
@@ -161,10 +150,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                                         )}
                                                     </div>
                                                     <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onViewFDA(med.name);
-                                                        }}
+                                                        onClick={(e) => { e.stopPropagation(); onViewFDA(med.name); }}
                                                         className="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100 hover:bg-blue-100 transition-colors uppercase tracking-wider shrink-0 ml-2"
                                                     >
                                                         FDA
@@ -174,9 +160,54 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                         </div>
                                     </div>
                                 </div>
-                            );
-                        }}
-                    />
+                            ))}
+                        </div>
+                    ) : (
+                        <VirtuosoGrid
+                            style={{ height: '100%' }}
+                            totalCount={medications.length}
+                            overscan={300}
+                            listClassName="grid grid-cols-1 md:grid-cols-2 gap-4 pb-24"
+                            itemContent={(index) => {
+                                const med = medications[index];
+                                return (
+                                    <div key={med.id} className="h-full">
+                                        <div
+                                            onClick={() => onMedClick(med)}
+                                            className="bg-white p-0 rounded-lg shadow-sm border border-slate-200 hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer overflow-hidden group h-full flex flex-col"
+                                        >
+                                            <div className="flex flex-1">
+                                                <div className={`w-1.5 ${(med.patients?.length || 0) > 0 ? 'bg-emerald-700' : 'bg-slate-200'}`} />
+                                                <div className="p-4 flex-1 flex flex-col">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <h3 className="font-bold text-emerald-950 text-lg leading-none group-hover:text-emerald-800 transition-colors">{med.name}</h3>
+                                                            <span className="text-slate-500 text-sm font-medium">{med.strength}</span>
+                                                        </div>
+                                                        <div className={`px-2 py-1 rounded text-xs font-bold border ${(med.patients?.length || 0) > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                                                            {med.patients?.length || 0} Pacientes
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex justify-between items-center mt-auto pt-3 border-t border-slate-100">
+                                                        <div className="flex items-center gap-4 text-xs text-slate-500">
+                                                            <span className="flex items-center gap-1 font-mono text-emerald-700/80 font-medium"><FileText size={12} /> {med.code}</span>
+                                                            <span className="flex items-center gap-1"><Syringe size={12} /> {med.route}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); onViewFDA(med.name); }}
+                                                            className="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-1 rounded border border-blue-100 hover:bg-blue-100 transition-colors uppercase tracking-wider shrink-0 ml-2"
+                                                        >
+                                                            FDA
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            }}
+                        />
+                    )
                 )}
 
                 {!loading && hasMore && (

@@ -1,4 +1,6 @@
 import { firebaseApp } from './app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 
-export const db = getFirestore(firebaseApp);
+export const db = initializeFirestore(firebaseApp, {
+  experimentalAutoDetectLongPolling: true,
+});

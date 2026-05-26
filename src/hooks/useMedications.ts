@@ -12,7 +12,6 @@ import {
     orderBy,
     limit,
     startAfter,
-    type DocumentData,
     type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import type { Medication } from '../types';
@@ -24,8 +23,8 @@ interface UseMedicationsOptions {
 const DEV_LOGS = import.meta.env.DEV;
 const PAGE_SIZE = 30;
 
-const mapMedication = (snapshotDoc: QueryDocumentSnapshot<DocumentData>): Medication => {
-    const data = snapshotDoc.data();
+const mapMedication = (snapshotDoc: QueryDocumentSnapshot<unknown>): Medication => {
+    const data = snapshotDoc.data() as Record<string, unknown>;
     let patients = [];
 
     if (Array.isArray(data.patients)) {
@@ -46,7 +45,7 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
     const [loading, setLoading] = useState(enabled);
     const [error, setError] = useState<string | null>(null);
     const [limitCount, setLimitCount] = useState(PAGE_SIZE);
-    const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+    const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<unknown> | null>(null);
     const [hasMore, setHasMore] = useState(true);
 
     useEffect(() => {
@@ -54,13 +53,11 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
             return;
         }
 
-        const q = query(
-            collection(db, 'medications'),
-            orderBy('name'),
-            limit(PAGE_SIZE)
-        );
+        const baseCollection = collection(db, 'medications');
+        const orderedQuery = query(baseCollection, orderBy('name'), limit(PAGE_SIZE));
+        const fallbackQuery = query(baseCollection, limit(PAGE_SIZE));
 
-        const unsubscribe = onSnapshot(
+        const subscribe = (q: ReturnType<typeof query>) => onSnapshot(
             q,
             (snapshot) => {
                 const firstPage = snapshot.docs.map(mapMedication);
@@ -84,6 +81,41 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
             }
         );
 
+        let unsubscribe = subscribe(orderedQuery);
+
+        // Always hydrate first page using plain HTTP read to avoid blank UI
+        // when realtime channels are blocked by network policy/proxy.
+        void getDocs(orderedQuery)
+            .then(async (snap) => {
+                const effective = snap.empty ? await getDocs(fallbackQuery) : snap;
+                const firstPage = effective.docs.map(mapMedication);
+                setMedications(firstPage);
+                setLastDoc(effective.docs.length > 0 ? effective.docs[effective.docs.length - 1] : null);
+                setHasMore(effective.docs.length === PAGE_SIZE);
+                setLimitCount(Math.max(PAGE_SIZE, effective.docs.length));
+                setLoading(false);
+            })
+            .catch(async () => {
+                const effective = await getDocs(fallbackQuery);
+                const firstPage = effective.docs.map(mapMedication);
+                setMedications(firstPage);
+                setLastDoc(effective.docs.length > 0 ? effective.docs[effective.docs.length - 1] : null);
+                setHasMore(effective.docs.length === PAGE_SIZE);
+                setLimitCount(Math.max(PAGE_SIZE, effective.docs.length));
+                setLoading(false);
+            });
+
+        // Fallback for legacy docs where `name` may be missing/inconsistent.
+        void getDocs(orderedQuery).then((snap) => {
+            if (snap.empty) {
+                unsubscribe();
+                unsubscribe = subscribe(fallbackQuery);
+            }
+        }).catch(() => {
+            unsubscribe();
+            unsubscribe = subscribe(fallbackQuery);
+        });
+
         return () => unsubscribe();
     }, [enabled]);
 
@@ -92,18 +124,17 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
 
         setLoading(true);
         try {
-            const nextQuery = query(
-                collection(db, 'medications'),
-                orderBy('name'),
-                startAfter(lastDoc),
-                limit(PAGE_SIZE)
-            );
+            const baseCollection = collection(db, 'medications');
+            const nextQuery = query(baseCollection, orderBy('name'), startAfter(lastDoc), limit(PAGE_SIZE));
             const nextSnapshot = await getDocs(nextQuery);
-            const nextMeds = nextSnapshot.docs.map(mapMedication);
+            const effectiveSnapshot = nextSnapshot.empty
+                ? await getDocs(query(baseCollection, startAfter(lastDoc), limit(PAGE_SIZE)))
+                : nextSnapshot;
+            const nextMeds = effectiveSnapshot.docs.map(mapMedication);
 
             setMedications((prev) => [...prev, ...nextMeds]);
-            setLastDoc(nextSnapshot.docs.length > 0 ? nextSnapshot.docs[nextSnapshot.docs.length - 1] : lastDoc);
-            setHasMore(nextSnapshot.docs.length === PAGE_SIZE);
+            setLastDoc(effectiveSnapshot.docs.length > 0 ? effectiveSnapshot.docs[effectiveSnapshot.docs.length - 1] : lastDoc);
+            setHasMore(effectiveSnapshot.docs.length === PAGE_SIZE);
             setLimitCount((prev) => prev + nextMeds.length);
             setError(null);
         } catch (err) {
