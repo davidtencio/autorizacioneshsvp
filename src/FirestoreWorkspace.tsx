@@ -16,13 +16,15 @@ import { useAuth } from './hooks/useAuth';
 import { removePatientById, suspendPatientTreatment, upsertPatient } from './utils/patientOperations';
 import { useDebouncedValue } from './hooks/useDebouncedValue';
 import { db } from './firebase/firestore';
-import { backfillMedicationPatients, deletePatientFromSubcollection, fetchPatientsByMedication, upsertPatientInSubcollection } from './services/patientStore';
+import { writeBatch, doc } from 'firebase/firestore';
+import { backfillMedicationPatients, fetchPatientsByMedication } from './services/patientStore';
 
 export const FirestoreWorkspace = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const { medications, loading: loadingMeds, error: errorMeds, addMedication, updateMedication, deleteMedication, loadMore, limitCount, hasMore } = useMedications({ enabled: true });
   const [patientsByMedication, setPatientsByMedication] = React.useState<Record<string, Patient[]>>({});
+  const backfilledIdsRef = React.useRef<Set<string>>(new Set());
   const { prescribers, loading: loadingPrescribers, error: errorPrescribers, addPrescriber, updatePrescriber, deletePrescriber } = usePrescribers({ enabled: true });
   const { toasts, addToast, searchQuery, setSearchQuery, setIsMedModalOpen, setIsPatientModalOpen, setIsDeleteModalOpen, setIsPrescribersListOpen, setIsPrescriberModalOpen, setDetailsPatient, editingId, setEditingId, editingPatientId, setEditingPatientId, editingPrescriberId, setEditingPrescriberId, targetMedIdForPatient, setTargetMedIdForPatient, deleteTarget, setDeleteTarget, openFDAModal, isRenewing, setIsRenewing } = useUI();
 
@@ -40,8 +42,15 @@ export const FirestoreWorkspace = () => {
 
   React.useEffect(() => {
     medications.forEach(async (med) => {
-      await backfillMedicationPatients(db, med).catch(() => undefined);
       const medId = String(med.id);
+      if (!backfilledIdsRef.current.has(medId)) {
+        try {
+          await backfillMedicationPatients(db, med);
+          backfilledIdsRef.current.add(medId);
+        } catch (err) {
+          console.error(`Error backfilling medication ${medId}:`, err);
+        }
+      }
       const subcollectionPatients = await fetchPatientsByMedication(db, medId).catch(() => []);
       setPatientsByMedication((prev) => ({
         ...prev,
@@ -66,9 +75,16 @@ export const FirestoreWorkspace = () => {
       } else if (deleteTarget.type === 'patient' && deleteTarget.parentId) {
         const med = medicationsWithPatients.find((m) => m.id === deleteTarget.parentId);
         if (med) {
-          await deletePatientFromSubcollection(db, String(med.id), Number(deleteTarget.id));
+          const batch = writeBatch(db);
+          const patientRef = doc(db, 'medications', String(med.id), 'patients', String(deleteTarget.id));
+          batch.delete(patientRef);
+
           const updatedPatients = removePatientById(med.patients, Number(deleteTarget.id));
-          await updateMedication(med.id, { patients: updatedPatients });
+          const medRef = doc(db, 'medications', String(med.id));
+          batch.update(medRef, { patients: updatedPatients });
+
+          await batch.commit();
+
           setPatientsByMedication((prev) => ({ ...prev, [String(med.id)]: updatedPatients }));
           addToast('Paciente eliminado', 'success');
         }
@@ -76,7 +92,8 @@ export const FirestoreWorkspace = () => {
         await deletePrescriber(deleteTarget.id);
         addToast('Prescriptor eliminado', 'success');
       }
-    } catch {
+    } catch (err) {
+      console.error('Error deleting:', err);
       addToast('Error al eliminar', 'error');
     }
     setIsDeleteModalOpen(false);
@@ -91,13 +108,20 @@ export const FirestoreWorkspace = () => {
       const { patients: updatedPatients, action } = upsertPatient({ patients: med.patients, patientFormData, editingPatientId, isRenewing });
       const targetPatient = updatedPatients.find((p) => p.id === Number(editingPatientId ?? updatedPatients[updatedPatients.length - 1]?.id));
       if (targetPatient) {
-        await upsertPatientInSubcollection(db, String(med.id), targetPatient);
+        const batch = writeBatch(db);
+        const patientRef = doc(db, 'medications', String(med.id), 'patients', String(targetPatient.id));
+        batch.set(patientRef, targetPatient, { merge: true });
+
+        const medRef = doc(db, 'medications', String(med.id));
+        batch.update(medRef, { patients: updatedPatients });
+
+        await batch.commit();
       }
       addToast(action === 'renewed' ? 'Autorizacion renovada' : action === 'updated' ? 'Paciente actualizado' : 'Paciente agregado exitosamente', 'success');
-      await updateMedication(med.id, { patients: updatedPatients });
       setPatientsByMedication((prev) => ({ ...prev, [String(med.id)]: updatedPatients }));
       setIsPatientModalOpen(false); setEditingPatientId(null); setTargetMedIdForPatient(null); setIsRenewing(false);
-    } catch {
+    } catch (err) {
+      console.error('Error adding patient:', err);
       addToast('Error al guardar paciente', 'error');
     }
   };
@@ -109,12 +133,19 @@ export const FirestoreWorkspace = () => {
       const updated = suspendPatientTreatment(med.patients, patient.id, reason, notes);
       const suspended = updated.find((p) => p.id === patient.id);
       if (suspended) {
-        await upsertPatientInSubcollection(db, String(med.id), suspended);
+        const batch = writeBatch(db);
+        const patientRef = doc(db, 'medications', String(med.id), 'patients', String(suspended.id));
+        batch.set(patientRef, suspended, { merge: true });
+
+        const medRef = doc(db, 'medications', String(med.id));
+        batch.update(medRef, { patients: updated });
+
+        await batch.commit();
       }
-      await updateMedication(med.id, { patients: updated });
       setPatientsByMedication((prev) => ({ ...prev, [String(med.id)]: updated }));
       addToast(`Tratamiento suspendido (${reason})`, 'success');
-    } catch {
+    } catch (err) {
+      console.error('Error suspending patient:', err);
       addToast('Error al suspender tratamiento', 'error');
     }
   };

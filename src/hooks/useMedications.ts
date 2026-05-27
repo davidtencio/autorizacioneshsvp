@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/firestore';
 import {
     collection,
@@ -48,10 +48,22 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
     const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<unknown> | null>(null);
     const [hasMore, setHasMore] = useState(true);
 
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
     useEffect(() => {
         if (!enabled) {
             return;
         }
+
+        let active = true;
+        let receivedSnapshot = false;
+        let unsubscribe = () => {};
 
         const baseCollection = collection(db, 'medications');
         const orderedQuery = query(baseCollection, orderBy('name'), limit(PAGE_SIZE));
@@ -60,6 +72,8 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
         const subscribe = (q: ReturnType<typeof query>) => onSnapshot(
             q,
             (snapshot) => {
+                if (!active) return;
+                receivedSnapshot = true;
                 const firstPage = snapshot.docs.map(mapMedication);
 
                 setMedications((prev) => {
@@ -75,48 +89,56 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
                 setLoading(false);
             },
             (err) => {
+                if (!active) return;
                 if (DEV_LOGS) console.error('Error fetching medications:', err);
                 setError(`Error: ${err.message} (${err.code})`);
                 setLoading(false);
             }
         );
 
-        let unsubscribe = subscribe(orderedQuery);
-
-        // Always hydrate first page using plain HTTP read to avoid blank UI
-        // when realtime channels are blocked by network policy/proxy.
-        void getDocs(orderedQuery)
-            .then(async (snap) => {
-                const effective = snap.empty ? await getDocs(fallbackQuery) : snap;
-                const firstPage = effective.docs.map(mapMedication);
-                setMedications(firstPage);
-                setLastDoc(effective.docs.length > 0 ? effective.docs[effective.docs.length - 1] : null);
-                setHasMore(effective.docs.length === PAGE_SIZE);
-                setLimitCount(Math.max(PAGE_SIZE, effective.docs.length));
-                setLoading(false);
-            })
-            .catch(async () => {
-                const effective = await getDocs(fallbackQuery);
-                const firstPage = effective.docs.map(mapMedication);
-                setMedications(firstPage);
-                setLastDoc(effective.docs.length > 0 ? effective.docs[effective.docs.length - 1] : null);
-                setHasMore(effective.docs.length === PAGE_SIZE);
-                setLimitCount(Math.max(PAGE_SIZE, effective.docs.length));
-                setLoading(false);
-            });
-
-        // Fallback for legacy docs where `name` may be missing/inconsistent.
-        void getDocs(orderedQuery).then((snap) => {
-            if (snap.empty) {
-                unsubscribe();
-                unsubscribe = subscribe(fallbackQuery);
+        const startSync = async () => {
+            let q = orderedQuery;
+            try {
+                const snap = await getDocs(orderedQuery);
+                if (snap.empty) {
+                    q = fallbackQuery;
+                }
+            } catch (err) {
+                if (DEV_LOGS) console.warn('Ordered query failed, falling back to unordered', err);
+                q = fallbackQuery;
             }
-        }).catch(() => {
-            unsubscribe();
-            unsubscribe = subscribe(fallbackQuery);
-        });
 
-        return () => unsubscribe();
+            if (!active) return;
+
+            // Start realtime subscription
+            unsubscribe = subscribe(q);
+
+            // Hydrate the first page using HTTP request as fallback/speedup
+            try {
+                const snap = await getDocs(q);
+                if (!active) return;
+                if (receivedSnapshot) {
+                    if (DEV_LOGS) console.log('Snapshot already received data, skipping HTTP hydration');
+                    return;
+                }
+                const firstPage = snap.docs.map(mapMedication);
+                setMedications(firstPage);
+                setLastDoc(snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null);
+                setHasMore(snap.docs.length === PAGE_SIZE);
+                setLimitCount(Math.max(PAGE_SIZE, snap.docs.length));
+                setLoading(false);
+            } catch (err) {
+                if (!active) return;
+                if (DEV_LOGS) console.error('Initial hydration failed:', err);
+            }
+        };
+
+        void startSync();
+
+        return () => {
+            active = false;
+            unsubscribe();
+        };
     }, [enabled]);
 
     const loadMore = async () => {
@@ -132,6 +154,7 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
                 : nextSnapshot;
             const nextMeds = effectiveSnapshot.docs.map(mapMedication);
 
+            if (!mountedRef.current) return;
             setMedications((prev) => [...prev, ...nextMeds]);
             setLastDoc(effectiveSnapshot.docs.length > 0 ? effectiveSnapshot.docs[effectiveSnapshot.docs.length - 1] : lastDoc);
             setHasMore(effectiveSnapshot.docs.length === PAGE_SIZE);
@@ -140,9 +163,12 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
         } catch (err) {
             if (DEV_LOGS) console.error('Error loading more medications:', err);
             const e = err as { message?: string; code?: string };
+            if (!mountedRef.current) return;
             setError(`Error: ${e.message ?? 'Error inesperado'} (${e.code ?? 'unknown'})`);
         } finally {
-            setLoading(false);
+            if (mountedRef.current) {
+                setLoading(false);
+            }
         }
     };
 
