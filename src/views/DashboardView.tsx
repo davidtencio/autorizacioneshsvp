@@ -1,12 +1,16 @@
 ﻿
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import { canEdit } from '../utils/permissions';
+import { useCanEdit } from '../hooks/useCanEdit';
 import { Users, Filter, List, Search, Plus, FileText, Syringe, Package, ShoppingBag, BarChart3 } from 'lucide-react';
 import { Header } from '../components/ui/Header';
 import { Skeleton } from '../components/ui/Skeleton';
 import type { Medication } from '../types';
+
+const getPatientCount = (med: Medication): number => {
+    if (med.patientsSummary && typeof med.patientsSummary.count === 'number') return med.patientsSummary.count;
+    return Array.isArray(med.patients) ? med.patients.length : 0;
+};
 import { VirtuosoGrid } from 'react-virtuoso';
 
 interface DashboardViewProps {
@@ -28,8 +32,7 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({
     medications, loading = false, onMedClick, onNewMed, onAddPrescriber, searchQuery, setSearchQuery, onLoadMore, limitCount, hasMore, onLogout, onViewFDA, error
 }) => {
-    const { user } = useAuth();
-    const isEditable = canEdit(user);
+    const isEditable = useCanEdit();
     const navigate = useNavigate();
 
     return (
@@ -127,15 +130,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                         className="bg-white p-0 rounded-lg shadow-sm border border-slate-200 hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer overflow-hidden group h-full flex flex-col"
                                     >
                                         <div className="flex flex-1">
-                                            <div className={`w-1.5 ${(med.patients?.length || 0) > 0 ? 'bg-emerald-700' : 'bg-slate-200'}`} />
+                                            <div className={`w-1.5 ${getPatientCount(med) > 0 ? 'bg-emerald-700' : 'bg-slate-200'}`} />
                                             <div className="p-4 flex-1 flex flex-col">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
                                                         <h3 className="font-bold text-emerald-950 text-lg leading-none group-hover:text-emerald-800 transition-colors">{med.name}</h3>
                                                         <span className="text-slate-500 text-sm font-medium">{med.strength}</span>
                                                     </div>
-                                                    <div className={`px-2 py-1 rounded text-xs font-bold border ${(med.patients?.length || 0) > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
-                                                        {med.patients?.length || 0} Pacientes
+                                                    <div className={`px-2 py-1 rounded text-xs font-bold border ${getPatientCount(med) > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                                                        {getPatientCount(med)} Pacientes
                                                     </div>
                                                 </div>
                                                 <div className="flex justify-between items-center mt-auto pt-3 border-t border-slate-100">
@@ -177,15 +180,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                             className="bg-white p-0 rounded-lg shadow-sm border border-slate-200 hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer overflow-hidden group h-full flex flex-col"
                                         >
                                             <div className="flex flex-1">
-                                                <div className={`w-1.5 ${(med.patients?.length || 0) > 0 ? 'bg-emerald-700' : 'bg-slate-200'}`} />
+                                                <div className={`w-1.5 ${getPatientCount(med) > 0 ? 'bg-emerald-700' : 'bg-slate-200'}`} />
                                                 <div className="p-4 flex-1 flex flex-col">
                                                     <div className="flex justify-between items-start mb-2">
                                                         <div>
                                                             <h3 className="font-bold text-emerald-950 text-lg leading-none group-hover:text-emerald-800 transition-colors">{med.name}</h3>
                                                             <span className="text-slate-500 text-sm font-medium">{med.strength}</span>
                                                         </div>
-                                                        <div className={`px-2 py-1 rounded text-xs font-bold border ${(med.patients?.length || 0) > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
-                                                            {med.patients?.length || 0} Pacientes
+                                                        <div className={`px-2 py-1 rounded text-xs font-bold border ${getPatientCount(med) > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                                                            {getPatientCount(med)} Pacientes
                                                         </div>
                                                     </div>
                                                     <div className="flex justify-between items-center mt-auto pt-3 border-t border-slate-100">
