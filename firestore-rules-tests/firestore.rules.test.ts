@@ -41,7 +41,8 @@ describe('firestore rules - phase 4', () => {
     });
 
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'medications/med-1'), {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, 'medications/med-1'), {
         code: '1-11',
         name: 'MED',
         strength: '10mg',
@@ -49,6 +50,10 @@ describe('firestore rules - phase 4', () => {
         type: 'General',
         patientsSummary: { count: 0, lastUpdated: '2026-05-28' },
       });
+      // Pre-seed canonical role docs that most tests reuse.
+      await setDoc(doc(fs, 'users/uid-editor'), { email: 'editor@hsvp.com', role: 'editor' });
+      await setDoc(doc(fs, 'users/uid-viewer'), { email: 'viewer@hsvp.com', role: 'viewer' });
+      await setDoc(doc(fs, 'users/uid-admin'), { email: 'admin@hsvp.com', role: 'admin' });
     });
   });
 
@@ -63,13 +68,17 @@ describe('firestore rules - phase 4', () => {
     await assertSucceeds(getDoc(doc(authDb, 'medications/med-1/patients/1')));
   });
 
-  it('allows valid patient write for editor user', async () => {
-    const authDb = testEnv.authenticatedContext('user-2', { email: 'editor@hsvp.com' }).firestore();
+  it('allows valid patient write for editor (whitelisted)', async () => {
+    const authDb = testEnv
+      .authenticatedContext('uid-editor', { email: 'editor@hsvp.com' })
+      .firestore();
     await assertSucceeds(setDoc(doc(authDb, 'medications/med-1/patients/1'), validPatient));
   });
 
   it('denies invalid patient write (issuer out of enum)', async () => {
-    const authDb = testEnv.authenticatedContext('user-3', { email: 'editor@hsvp.com' }).firestore();
+    const authDb = testEnv
+      .authenticatedContext('uid-editor', { email: 'editor@hsvp.com' })
+      .firestore();
     await assertFails(
       setDoc(doc(authDb, 'medications/med-1/patients/2'), {
         ...validPatient,
@@ -79,34 +88,30 @@ describe('firestore rules - phase 4', () => {
     );
   });
 
-  it('denies write for readonly user (legacy fallback)', async () => {
-    const readonlyDb = testEnv.authenticatedContext('user-4', { email: 'fhsvp2208@gmail.com' }).firestore();
-    await assertFails(setDoc(doc(readonlyDb, 'medications/med-1/patients/3'), { ...validPatient, id: 3 }));
-  });
-
-  it('allows write when users/{uid}.role = editor', async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'users/user-editor'), {
-        email: 'editor@hsvp.com',
-        role: 'editor',
-      });
-    });
-    const editorDb = testEnv.authenticatedContext('user-editor', { email: 'editor@hsvp.com' }).firestore();
-    await assertSucceeds(
-      setDoc(doc(editorDb, 'medications/med-1/patients/10'), { ...validPatient, id: 10 })
+  it('denies write for user WITHOUT users/{uid} doc (strict whitelist)', async () => {
+    const noDocDb = testEnv
+      .authenticatedContext('uid-not-seeded', { email: 'random@hsvp.com' })
+      .firestore();
+    await assertFails(
+      setDoc(doc(noDocDb, 'medications/med-1/patients/3'), { ...validPatient, id: 3 })
     );
   });
 
-  it('denies write when users/{uid}.role = viewer', async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'users/user-viewer'), {
-        email: 'viewer@hsvp.com',
-        role: 'viewer',
-      });
-    });
-    const viewerDb = testEnv.authenticatedContext('user-viewer', { email: 'viewer@hsvp.com' }).firestore();
+  it('denies write for viewer role', async () => {
+    const viewerDb = testEnv
+      .authenticatedContext('uid-viewer', { email: 'viewer@hsvp.com' })
+      .firestore();
     await assertFails(
       setDoc(doc(viewerDb, 'medications/med-1/patients/11'), { ...validPatient, id: 11 })
+    );
+  });
+
+  it('allows write for admin role', async () => {
+    const adminDb = testEnv
+      .authenticatedContext('uid-admin', { email: 'admin@hsvp.com' })
+      .firestore();
+    await assertSucceeds(
+      setDoc(doc(adminDb, 'medications/med-1/patients/12'), { ...validPatient, id: 12 })
     );
   });
 
@@ -201,6 +206,14 @@ describe('firestore rules - phase 4', () => {
   });
 
   it('medication doc: rejects write missing patientsSummary', async () => {
+    // user-strict3 is a real editor; the rejection must come from the document
+    // schema validation, not from the whitelist check.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/user-strict3'), {
+        email: 'strict3@hsvp.com',
+        role: 'editor',
+      });
+    });
     const editorDb = testEnv.authenticatedContext('user-strict3', { email: 'strict3@hsvp.com' }).firestore();
     await assertFails(
       setDoc(doc(editorDb, 'medications/med-bad'), {

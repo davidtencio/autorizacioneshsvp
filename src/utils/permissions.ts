@@ -1,27 +1,19 @@
 import type { User } from 'firebase/auth';
 import type { Role, RoleState } from '../hooks/useRole';
 
-export const READ_ONLY_USERS = ['fhsvp2208@gmail.com'];
-
 const EDITOR_ROLES: ReadonlySet<Role> = new Set<Role>(['admin', 'editor']);
 
 /**
- * Legacy email-list check. Kept for fallback while users/{uid} is being seeded.
- * Returns true if the user is allowed to write under the legacy model
- * (signed-in, non-anonymous, not in the read-only whitelist).
- */
-export const canEdit = (user: User | null): boolean => {
-  if (!user) return false;
-  if (user.isAnonymous || !user.email) return false;
-  return !READ_ONLY_USERS.includes(user.email);
-};
-
-/**
- * Hybrid permission check. Prefers users/{uid}.role when available;
- * falls back to legacy email-list while the role doc is missing.
+ * Strict whitelist permission check.
  *
- *   hasRoleDoc=true  → role must be admin|editor
- *   hasRoleDoc=false → legacy canEdit(user) applies
+ *   - No user / anonymous / no email   → false.
+ *   - Role doc still loading           → false (avoid flashing edit UI).
+ *   - users/{uid} doc missing          → false (no implicit access).
+ *   - users/{uid}.role missing/invalid → false.
+ *   - users/{uid}.role ∈ {admin, editor} → true.
+ *
+ * The previous hybrid mode (legacy email-list fallback) was retired once
+ * all current editors were seeded via scripts/auth/seed-user-roles.mjs.
  */
 export const canEditWithRole = (
   user: User | null,
@@ -30,8 +22,6 @@ export const canEditWithRole = (
   if (!user) return false;
   if (roleState.loading) return false;
   if (user.isAnonymous || !user.email) return false;
-  if (roleState.hasRoleDoc) {
-    return roleState.role !== null && EDITOR_ROLES.has(roleState.role);
-  }
-  return canEdit(user);
+  if (!roleState.hasRoleDoc) return false;
+  return roleState.role !== null && EDITOR_ROLES.has(roleState.role);
 };

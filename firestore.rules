@@ -10,13 +10,6 @@ service cloud.firestore {
         && request.auth.token.firebase.sign_in_provider == 'anonymous';
     }
 
-    function isReadOnlyUser() {
-      return isSignedIn()
-        && request.auth.token.email in [
-          'fhsvp2208@gmail.com'
-        ];
-    }
-
     function hasUserDoc() {
       return isSignedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid));
@@ -26,16 +19,14 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
-    // Hybrid permission:
-    //  - If users/{uid} exists, role must be 'admin' or 'editor'.
-    //  - If users/{uid} does NOT exist, fall back to legacy logic
-    //    (signed-in, non-anonymous, not in read-only whitelist).
-    // The fallback will be removed once all current editors are seeded.
+    // Strict whitelist: only users with a users/{uid} document and a role
+    // in {admin, editor} can write. The legacy email-based fallback was
+    // removed once all current editors were seeded.
     function canWrite() {
-      return isSignedIn() && !isAnonymous() && (
-        (hasUserDoc() && userRole() in ['admin', 'editor'])
-        || (!hasUserDoc() && !isReadOnlyUser())
-      );
+      return isSignedIn()
+        && !isAnonymous()
+        && hasUserDoc()
+        && userRole() in ['admin', 'editor'];
     }
 
     function validMedicationCategory(value) {

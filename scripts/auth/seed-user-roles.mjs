@@ -35,7 +35,9 @@ const auth = getAuth();
 const db = getFirestore();
 
 async function main() {
-  const config = JSON.parse(readFileSync(rolesFile, 'utf8'));
+  // Strip UTF-8 BOM (Windows PowerShell 5.1 writes it by default) before parsing.
+  const raw = readFileSync(rolesFile, 'utf8').replace(/^﻿/, '');
+  const config = JSON.parse(raw);
   const byEmail = config.byEmail ?? {};
   const entries = Object.entries(byEmail);
 

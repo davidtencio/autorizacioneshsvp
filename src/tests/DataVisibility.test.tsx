@@ -41,7 +41,6 @@ vi.mock('../hooks/useAuth', () => ({
 }));
 
 vi.mock('../utils/permissions', () => ({
-    canEdit: () => true,
     canEditWithRole: () => true,
 }));
 
