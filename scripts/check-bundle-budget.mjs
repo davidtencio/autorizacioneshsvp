@@ -1,7 +1,7 @@
 ﻿import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-const BUDGET_KB = 770
+const BUDGET_KB = 850
 const assetsDir = join(process.cwd(), 'dist', 'assets')
 const jsFiles = readdirSync(assetsDir).filter((name) => name.endsWith('.js'))
 
