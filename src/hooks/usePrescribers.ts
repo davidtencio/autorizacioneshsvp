@@ -31,7 +31,12 @@ export const usePrescribers = ({ enabled = true }: UsePrescribersOptions = {}) =
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const prescs: Prescriber[] = [];
             snapshot.forEach((doc) => {
-                prescs.push({ ...doc.data(), id: doc.id } as unknown as Prescriber);
+                const data = doc.data() as Record<string, unknown>;
+                prescs.push({
+                    id: doc.id,
+                    name: typeof data.name === 'string' ? data.name : '',
+                    specialty: typeof data.specialty === 'string' ? data.specialty : '',
+                });
             });
             setPrescribers(prescs);
             setError(null);

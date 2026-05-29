@@ -37,11 +37,16 @@ export const deletePatientFromSubcollection = async (
   await deleteDoc(patientDoc(db, medicationId, patientId));
 };
 
+// Accepts MM/YYYY (form-formatted) or a leading ISO date prefix (YYYY-MM-DD).
+// Anything else (e.g. legacy garbage like "82/6") is ignored so it doesn't
+// pollute the patientsSummary.lastUpdated field with malformed values.
+const VALID_DATE_RE = /^(\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/;
+
 export const buildPatientsSummary = (patients: Patient[]): PatientsSummary => {
   let lastUpdated = '';
   for (const p of patients) {
     const candidates = [p.suspensionDate, p.endMonth, p.startMonth].filter(
-      (v): v is string => typeof v === 'string' && v.length > 0
+      (v): v is string => typeof v === 'string' && VALID_DATE_RE.test(v)
     );
     for (const c of candidates) {
       if (c > lastUpdated) lastUpdated = c;

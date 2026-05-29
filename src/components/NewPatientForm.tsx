@@ -6,6 +6,7 @@ import { Modal } from './ui/Modal';
 import { TransferControlContent } from './TransferControlModalContent';
 import type { Patient, Prescriber } from '../types';
 import { formatDateMMYYYY } from '../utils/formatters';
+import { HOSP_MEXICO } from '../utils/constants';
 
 interface NewPatientFormProps {
     onSubmit: (data: Omit<Patient, 'id'>) => void;
@@ -47,7 +48,7 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
         const upperValue = value.toUpperCase();
         setFormData(prev => ({ ...prev, [field]: upperValue }));
 
-        if (field === 'applicationPlace' && upperValue === 'HOSP. MÉXICO') {
+        if (field === 'applicationPlace' && upperValue === HOSP_MEXICO) {
             setIsTransferModalOpen(true);
         }
     };
@@ -221,12 +222,12 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                             >
                                 <option value="">Seleccionar...</option>
                                 <option value="HOSP. HEREDIA">Hosp. Heredia</option>
-                                <option value="HOSP. MÉXICO">Hosp. México</option>
+                                <option value={HOSP_MEXICO}>Hosp. México</option>
                                 <option value="OTRO">Otro</option>
                             </select>
                             <ChevronLeft size={16} className="absolute right-4 top-1/2 -translate-y-1/2 -rotate-90 text-slate-400 pointer-events-none" />
                         </div>
-                        {formData.applicationPlace === 'HOSP. MÉXICO' && (
+                        {formData.applicationPlace === HOSP_MEXICO && (
                             <button
                                 type="button"
                                 onClick={() => setIsTransferModalOpen(true)}

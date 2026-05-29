@@ -2,6 +2,7 @@
 import { Users, AlertTriangle, Activity, Stethoscope, Truck } from 'lucide-react';
 import type { Medication, Patient } from '../types';
 import { isAuthorizationExpired } from '../utils/statusUtils';
+import { isHospitalMexico } from '../utils/constants';
 import { ExpiringPatientsModal } from './ExpiringPatientsModal';
 import { PendingTransfersModal } from './PendingTransfersModal';
 
@@ -52,7 +53,7 @@ export const KPIStats: React.FC<KPIStatsProps> = ({ medications }) => {
 
                     const pendingBalance = parseFloat(patient.transferControl?.pendingBalance || '0');
                     const hasPendingTransfer =
-                        patient.applicationPlace === 'HOSP. M\u00C9XICO'
+                        isHospitalMexico(patient.applicationPlace)
                         && !!patient.transferControl
                         && !isNaN(pendingBalance)
                         && pendingBalance > 0;

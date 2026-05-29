@@ -79,7 +79,7 @@ export const suspendPatientTreatment = (
                 ...patient,
                 status: 'Suspended' as const,
                 suspensionReason: reason,
-                suspensionNotes: notes,
+                ...(notes !== undefined ? { suspensionNotes: notes } : {}),
                 suspensionDate: nowIso
             }
             : patient

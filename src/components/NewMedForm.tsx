@@ -7,7 +7,7 @@ import { formatMedicationCode } from '../utils/formatters';
 
 interface NewMedFormProps {
     onSubmit: (data: Partial<Medication>) => void;
-    initialData?: Medication | null; // Changed to full object for easier population
+    initialData?: Medication | null | undefined;
     isEditing: boolean;
 }
 

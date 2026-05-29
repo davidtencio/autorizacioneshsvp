@@ -2,9 +2,9 @@ import type { WriteBatch } from 'firebase/firestore';
 import { logger } from '../utils/logger';
 
 interface FirestoreLikeError {
-  code?: string;
-  message?: string;
-  name?: string;
+  code?: string | undefined;
+  message?: string | undefined;
+  name?: string | undefined;
 }
 
 function describeError(err: unknown): FirestoreLikeError {

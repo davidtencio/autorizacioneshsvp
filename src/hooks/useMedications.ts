@@ -14,7 +14,7 @@ import {
     startAfter,
     type QueryDocumentSnapshot,
 } from 'firebase/firestore';
-import type { Medication } from '../types';
+import type { Medication, Patient, PatientsSummary } from '../types';
 import { logger } from '../utils/logger';
 
 interface UseMedicationsOptions {
@@ -23,12 +23,15 @@ interface UseMedicationsOptions {
 
 const PAGE_SIZE = 30;
 
+const asString = (value: unknown, fallback = ''): string =>
+    typeof value === 'string' ? value : fallback;
+
 const mapMedication = (snapshotDoc: QueryDocumentSnapshot<unknown>): Medication => {
     const data = snapshotDoc.data() as Record<string, unknown>;
-    let patients = [];
+    let patients: Patient[] = [];
 
     if (Array.isArray(data.patients)) {
-        patients = data.patients;
+        patients = data.patients as Patient[];
     } else if (data.patients) {
         logger.warn('medication_invalid_patients_field', {
             medId: snapshotDoc.id,
@@ -37,11 +40,22 @@ const mapMedication = (snapshotDoc: QueryDocumentSnapshot<unknown>): Medication 
         });
     }
 
-    return {
-        ...data,
+    const med: Medication = {
         id: snapshotDoc.id,
+        code: asString(data.code),
+        name: asString(data.name),
+        strength: asString(data.strength),
+        route: asString(data.route),
+        type: asString(data.type),
         patients,
-    } as unknown as Medication;
+    };
+    if (data.category === 'Almacenable' || data.category === 'Compra Local' || data.category === 'No Definido') {
+        med.category = data.category;
+    }
+    if (data.patientsSummary && typeof data.patientsSummary === 'object') {
+        med.patientsSummary = data.patientsSummary as PatientsSummary;
+    }
+    return med;
 };
 
 export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) => {

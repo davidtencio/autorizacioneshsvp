@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { TransferControl } from '../types';
 
 interface TransferControlContentProps {
-    initialData?: TransferControl;
+    initialData?: TransferControl | undefined;
     onSave: (data: TransferControl) => void;
     onCancel: () => void;
 }

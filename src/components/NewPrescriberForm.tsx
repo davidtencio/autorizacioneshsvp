@@ -6,7 +6,7 @@ import type { Prescriber } from '../types';
 
 interface NewPrescriberFormProps {
     onSubmit: (data: Partial<Prescriber>) => void;
-    initialData?: Partial<Prescriber> | null;
+    initialData?: Partial<Prescriber> | null | undefined;
 }
 
 export const NewPrescriberForm: React.FC<NewPrescriberFormProps> = ({

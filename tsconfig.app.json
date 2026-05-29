@@ -23,7 +23,8 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    "noImplicitOverride": true
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/tests/**", "src/setupTests.ts"]

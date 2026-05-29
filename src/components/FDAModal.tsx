@@ -10,10 +10,10 @@ import { useUI } from '../context/UIContext';
 interface AccordionProps {
     title: string;
     icon: React.ElementType;
-    content?: string[];
+    content?: string[] | undefined;
     colorClass: string;
     onTranslate: (text: string) => void;
-    defaultOpen?: boolean;
+    defaultOpen?: boolean | undefined;
 }
 
 const AccordionSection = ({ title, icon: Icon, content, colorClass, onTranslate, defaultOpen = false }: AccordionProps) => {

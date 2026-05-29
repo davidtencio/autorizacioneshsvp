@@ -81,14 +81,20 @@ function diffArrayVsSub(arr, subMap) {
   return { onlyInArray, onlyInSub, both };
 }
 
+// Matches MM/YYYY or YYYY-MM-DD prefix; ignores malformed legacy values
+// like "82/6" so they don't pollute patientsSummary.lastUpdated.
+const VALID_DATE_RE = /^(\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/;
+
 function summaryFor(patients) {
   // The subcollection is the source of truth post-migration.
   const safeArr = Array.isArray(patients) ? patients : [];
   let lastUpdated = '';
   for (const p of safeArr) {
-    const candidates = [p?.suspensionDate, p?.endMonth, p?.startMonth].filter(Boolean);
+    const candidates = [p?.suspensionDate, p?.endMonth, p?.startMonth].filter(
+      (v) => typeof v === 'string' && VALID_DATE_RE.test(v)
+    );
     for (const c of candidates) {
-      if (typeof c === 'string' && c > lastUpdated) lastUpdated = c;
+      if (c > lastUpdated) lastUpdated = c;
     }
   }
   return {
