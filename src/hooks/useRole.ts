@@ -27,7 +27,6 @@ export function useRole(user: User | null): RoleState {
       setState({ role: null, loading: false, hasRoleDoc: false });
       return;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setState((s) => ({ ...s, loading: true }));
     const unsub = onSnapshot(
       doc(db, 'users', user.uid),
