@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Patient } from '../types';
-import { removePatientById, suspendPatientTreatment, upsertPatient } from './patientOperations';
+import { removePatientById, suspendPatientTreatment, upsertPatient, validatePatientForm } from './patientOperations';
 
 const basePatient = (overrides: Partial<Patient> = {}): Patient => ({
     id: 1,
@@ -20,6 +20,34 @@ const basePatient = (overrides: Partial<Patient> = {}): Patient => ({
     prescriber: 'DR. A',
     specialty: 'ONCOLOGIA',
     ...overrides
+});
+
+describe('validatePatientForm', () => {
+    const formFrom = (overrides: Partial<Patient> = {}): Omit<Patient, 'id'> => {
+        const p = basePatient(overrides);
+        delete (p as Partial<Patient>).id;
+        return p;
+    };
+
+    it('returns no missing fields for a complete form', () => {
+        expect(validatePatientForm(formFrom())).toEqual([]);
+    });
+
+    it('flags empty and whitespace-only required fields', () => {
+        const missing = validatePatientForm(formFrom({ diagnosis: '', name: '   ' }));
+        expect(missing).toContain('diagnosis');
+        expect(missing).toContain('name');
+    });
+
+    it('flags an issuer outside the allowed enum', () => {
+        expect(validatePatientForm(formFrom({ issuer: 'XXX' }))).toContain('issuer');
+    });
+
+    it('accepts each valid issuer value', () => {
+        for (const issuer of ['CCF', 'CLF', 'RA']) {
+            expect(validatePatientForm(formFrom({ issuer }))).not.toContain('issuer');
+        }
+    });
 });
 
 describe('patientOperations', () => {
