@@ -43,7 +43,7 @@ export const DetailsRouteWrapper: React.FC<DetailsRouteWrapperProps> = ({
         <DetailsView
             selectedMed={selectedMed}
             onDeletePatient={(patientId) => {
-                const patient = selectedMed.patients.find(p => p.id === patientId);
+                const patient = (selectedMed.patients ?? []).find(p => p.id === patientId);
                 if (patient) {
                     onDeletePatient(patient, selectedMed.id);
                 }

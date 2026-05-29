@@ -56,7 +56,7 @@ export const AppModals: React.FC<AppModalsProps> = ({
         if (!editingPatientId || !targetMedIdForPatient) return null;
         const med = medications.find(m => m.id === targetMedIdForPatient);
         if (!med) return null;
-        const patient = med.patients.find(p => p.id === editingPatientId);
+        const patient = (med.patients ?? []).find(p => p.id === editingPatientId);
         return patient ? { ...patient } : null; // Removed id in form logic, strict types might complain if we pass id, but form expects Omit<Patient, 'id'>. Let's cast or spread.
     }, [editingPatientId, targetMedIdForPatient, medications]);
 

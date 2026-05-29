@@ -51,7 +51,7 @@ export const useMedicationActions = ({
                     route: data.route || 'Oral',
                     category: data.category || 'Almacenable',
                     type: 'General',
-                    patients: []
+                    patientsSummary: { count: 0, lastUpdated: new Date().toISOString().slice(0, 10) },
                 });
                 addToast('Medicamento creado con éxito', 'success');
             }

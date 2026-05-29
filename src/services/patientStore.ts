@@ -4,10 +4,9 @@ import {
   doc,
   getDocs,
   setDoc,
-  writeBatch,
   type Firestore,
 } from 'firebase/firestore';
-import type { Medication, Patient } from '../types';
+import type { Patient, PatientsSummary } from '../types';
 
 const patientCollection = (db: Firestore, medicationId: string) =>
   collection(db, 'medications', medicationId, 'patients');
@@ -38,14 +37,19 @@ export const deletePatientFromSubcollection = async (
   await deleteDoc(patientDoc(db, medicationId, patientId));
 };
 
-export const backfillMedicationPatients = async (
-  db: Firestore,
-  medication: Medication
-): Promise<void> => {
-  if (!Array.isArray(medication.patients) || medication.patients.length === 0) return;
-  const batch = writeBatch(db);
-  for (const patient of medication.patients) {
-    batch.set(patientDoc(db, String(medication.id), patient.id), patient, { merge: true });
+export const buildPatientsSummary = (patients: Patient[]): PatientsSummary => {
+  let lastUpdated = '';
+  for (const p of patients) {
+    const candidates = [p.suspensionDate, p.endMonth, p.startMonth].filter(
+      (v): v is string => typeof v === 'string' && v.length > 0
+    );
+    for (const c of candidates) {
+      if (c > lastUpdated) lastUpdated = c;
+    }
   }
-  await batch.commit();
+  return {
+    count: patients.length,
+    lastUpdated: lastUpdated || new Date().toISOString().slice(0, 10),
+  };
 };
+

@@ -17,8 +17,25 @@ service cloud.firestore {
         ];
     }
 
+    function hasUserDoc() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // Hybrid permission:
+    //  - If users/{uid} exists, role must be 'admin' or 'editor'.
+    //  - If users/{uid} does NOT exist, fall back to legacy logic
+    //    (signed-in, non-anonymous, not in read-only whitelist).
+    // The fallback will be removed once all current editors are seeded.
     function canWrite() {
-      return isSignedIn() && !isAnonymous() && !isReadOnlyUser();
+      return isSignedIn() && !isAnonymous() && (
+        (hasUserDoc() && userRole() in ['admin', 'editor'])
+        || (!hasUserDoc() && !isReadOnlyUser())
+      );
     }
 
     function validMedicationCategory(value) {
@@ -43,20 +60,28 @@ service cloud.firestore {
       return value is string && value in ['CCF', 'CLF', 'RA'];
     }
 
-    function validPatientsList(patients) {
-      return patients is list
-        && patients.size() <= 200;
+    function validPatientsSummary(value) {
+      return value is map
+        && value.keys().hasOnly(['count', 'lastUpdated'])
+        && value.keys().hasAll(['count', 'lastUpdated'])
+        // Note: Firebase Web SDK serializes JS Numbers as Double, even when
+        // they are integer values. Using `is number` (accepts int and float)
+        // instead of `is int` to allow updates from the client.
+        && value.count is number
+        && value.count >= 0
+        && value.lastUpdated is string
+        && value.lastUpdated.size() <= 40;
     }
 
     function isMedicationDocument(data) {
-      return data.keys().hasAll(['code', 'name', 'strength', 'route', 'type', 'patients'])
-        && data.keys().hasOnly(['code', 'name', 'strength', 'route', 'type', 'category', 'patients'])
+      return data.keys().hasAll(['code', 'name', 'strength', 'route', 'type', 'patientsSummary'])
+        && data.keys().hasOnly(['code', 'name', 'strength', 'route', 'type', 'category', 'patientsSummary', 'patientsSummaryMigratedAt'])
         && validString(data.code, 40)
         && validString(data.name, 200)
         && validString(data.strength, 80)
         && validString(data.route, 80)
         && validString(data.type, 60)
-        && validPatientsList(data.patients)
+        && validPatientsSummary(data.patientsSummary)
         && (
           !data.keys().hasAny(['category'])
           || (data.category is string && validMedicationCategory(data.category))
@@ -174,14 +199,41 @@ service cloud.firestore {
       allow delete: if canWrite();
     }
 
+    match /users/{userId} {
+      // Each user can read only their own role doc.
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      // Writes are managed by the seed script using a service account
+      // (which bypasses rules). Clients cannot create/update/delete roles.
+      allow write: if false;
+    }
+
+    function isValidOpsLogPayload(data) {
+      return data.keys().hasAll(['ts', 'level', 'message'])
+        && data.keys().hasOnly(['ts', 'level', 'message', 'meta'])
+        && data.level in ['info', 'warn', 'error']
+        && data.message is string
+        && data.message.size() > 0
+        && data.message.size() <= 500
+        && data.ts is string
+        && data.ts.size() <= 40
+        && (!data.keys().hasAny(['meta']) || data.meta is map);
+    }
+
     match /ops_logs/{logId} {
-      allow create: if canWrite();
+      // Any signed-in non-anonymous user can append a log entry, but the
+      // payload must conform to the schema (capped fields + size).
+      allow create: if isSignedIn()
+        && !isAnonymous()
+        && isValidOpsLogPayload(request.resource.data);
       allow read, update, delete: if false;
     }
 
+    // Catch-all: deny access to any collection not explicitly matched above.
+    // Note: in Firestore rules, allow conditions across matching rules are OR'd.
+    // Keeping this strict (deny by default) ensures unlisted collections — and
+    // sensitive docs like users/{uid} — are not exposed.
     match /{document=**} {
-      allow read: if isSignedIn();
-      allow write: if false;
+      allow read, write: if false;
     }
   }
 }

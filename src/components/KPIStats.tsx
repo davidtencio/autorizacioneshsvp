@@ -41,7 +41,7 @@ export const KPIStats: React.FC<KPIStatsProps> = ({ medications }) => {
         const currentMonth = now.getMonth() + 1; // 1-12
 
         medications.forEach(med => {
-            med.patients.forEach(patient => {
+            (med.patients ?? []).forEach(patient => {
                 totalPatients++;
 
                 // Status Counts

@@ -54,6 +54,11 @@ export interface Patient {
   authorizationHistory?: AuthorizationHistoryItem[];
 }
 
+export interface PatientsSummary {
+  count: number;
+  lastUpdated: string;
+}
+
 export interface Medication {
   id: string; // Firestore ID
   code: string;
@@ -62,7 +67,14 @@ export interface Medication {
   route: string; // Vía de administración
   type: string; // Tipo (General, etc.)
   category?: 'Almacenable' | 'Compra Local' | 'No Definido'; // New Category
-  patients: Patient[];
+  // Phase 2.d: patients[] no longer lives in the medication doc. It is
+  // hydrated client-side from the subcollection medications/{id}/patients.
+  // Kept optional in the type so consumers that rely on this shape (e.g.
+  // medicationsWithPatients in FirestoreWorkspace) keep type-checking,
+  // but newly read docs from Firestore won't have this field.
+  patients?: Patient[];
+  // Source of truth for the patient count in listings.
+  patientsSummary?: PatientsSummary;
 }
 
 export interface Toast {
