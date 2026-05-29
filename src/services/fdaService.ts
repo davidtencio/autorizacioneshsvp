@@ -19,6 +19,18 @@ const fetchWithTimeout = async (url: string, timeoutMs: number): Promise<Respons
 
 const shouldRetry = (status: number) => status === 429 || status >= 500;
 
+// Flag attached to errors that exhausted retries so the outer catch knows
+// not to retry them again. Avoids the previous bug where a 400 (never
+// retryable by status) would still be retried 3 times via the outer catch.
+class FdaHttpError extends Error {
+    readonly status: number;
+    constructor(status: number, statusText: string) {
+        super(`FDA API Error: ${status} ${statusText}`);
+        this.name = 'FdaHttpError';
+        this.status = status;
+    }
+}
+
 export const fetchDrugLabel = async (drugName: string) => {
     const normalizedDrugName = drugName.trim().replace(/["\\]/g, ' ').replace(/\s+/g, ' ');
     if (!normalizedDrugName) {
@@ -41,14 +53,15 @@ export const fetchDrugLabel = async (drugName: string) => {
                     await sleep(RETRY_DELAYS_MS[attempt]);
                     continue;
                 }
-                throw new Error(`FDA API Error: ${response.status} ${response.statusText}`);
+                throw new FdaHttpError(response.status, response.statusText);
             }
 
             const data = await response.json();
             return data.results && data.results.length > 0 ? data.results[0] : null;
         } catch (error) {
             const isAbort = error instanceof Error && error.name === 'AbortError';
-            if (attempt < RETRY_DELAYS_MS.length) {
+            const isUnretryableHttp = error instanceof FdaHttpError;
+            if (!isUnretryableHttp && attempt < RETRY_DELAYS_MS.length) {
                 await sleep(RETRY_DELAYS_MS[attempt]);
                 continue;
             }

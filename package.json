@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "npm run test:unit",
-    "test:unit": "vitest run src/utils/statusUtils.test.ts src/utils/permissions.test.ts src/utils/patientOperations.test.ts src/utils/formatters.test.ts src/App.test.tsx src/tests/DataVisibility.test.tsx src/views/DetailsView.test.tsx",
+    "test:unit": "vitest run --dir src",
     "test:rules": "firebase emulators:exec --only firestore \"vitest run --config firestore-rules-tests/vitest.rules.config.ts firestore-rules-tests/firestore.rules.test.ts\"",
     "quality:baseline": "npm run lint && npm run test -- --run && npm run build && npm run bundle:check && npm run smoke"
   },
