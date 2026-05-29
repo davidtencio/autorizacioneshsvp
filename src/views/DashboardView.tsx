@@ -35,6 +35,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const isEditable = useCanEdit();
     const navigate = useNavigate();
 
+    const activateOnKey = (e: React.KeyboardEvent, fn: () => void) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fn();
+        }
+    };
+
     return (
         <div className="pb-24 bg-slate-50 min-h-screen flex flex-col">
             <Header
@@ -126,8 +133,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             {medications.map((med) => (
                                 <div key={med.id} className="h-full">
                                     <div
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-label={`Ver ${med.name}`}
                                         onClick={() => onMedClick(med)}
-                                        className="bg-white p-0 rounded-lg shadow-sm border border-slate-200 hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer overflow-hidden group h-full flex flex-col"
+                                        onKeyDown={(e) => activateOnKey(e, () => onMedClick(med))}
+                                        className="bg-white p-0 rounded-lg shadow-sm border border-slate-200 hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer overflow-hidden group h-full flex flex-col focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                     >
                                         <div className="flex flex-1">
                                             <div className={`w-1.5 ${getPatientCount(med) > 0 ? 'bg-emerald-700' : 'bg-slate-200'}`} />
@@ -176,8 +187,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 return (
                                     <div key={med.id} className="h-full">
                                         <div
+                                            role="button"
+                                            tabIndex={0}
+                                            aria-label={`Ver ${med.name}`}
                                             onClick={() => onMedClick(med)}
-                                            className="bg-white p-0 rounded-lg shadow-sm border border-slate-200 hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer overflow-hidden group h-full flex flex-col"
+                                            onKeyDown={(e) => activateOnKey(e, () => onMedClick(med))}
+                                            className="bg-white p-0 rounded-lg shadow-sm border border-slate-200 hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer overflow-hidden group h-full flex flex-col focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                         >
                                             <div className="flex flex-1">
                                                 <div className={`w-1.5 ${getPatientCount(med) > 0 ? 'bg-emerald-700' : 'bg-slate-200'}`} />

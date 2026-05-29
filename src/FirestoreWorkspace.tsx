@@ -170,7 +170,8 @@ export const FirestoreWorkspace = () => {
             />
           }
         />
-        <Route path="/kpi" element={<KPIView medications={filteredMedications} />} />
+        {/* KPIs must reflect the full dataset, not the search-filtered subset. */}
+        <Route path="/kpi" element={<KPIView medications={medicationsWithPatients} />} />
         <Route
           path="/medication/:id"
           element={

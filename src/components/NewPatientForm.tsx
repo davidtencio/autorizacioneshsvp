@@ -1,12 +1,17 @@
 
 import React, { useState } from 'react';
-import { FileText, Users, ShieldPlus, ChevronLeft } from 'lucide-react';
+import { FileText, Users, ShieldPlus, ChevronLeft, AlertTriangle } from 'lucide-react';
 import { CorporateInput } from './ui/CorporateInput';
 import { Modal } from './ui/Modal';
 import { TransferControlContent } from './TransferControlModalContent';
 import type { Patient, Prescriber } from '../types';
 import { formatDateMMYYYY } from '../utils/formatters';
 import { HOSP_MEXICO } from '../utils/constants';
+import { validatePatientForm, REQUIRED_PATIENT_FIELDS } from '../utils/patientOperations';
+
+const FIELD_LABELS: Record<string, string> = Object.fromEntries(
+    REQUIRED_PATIENT_FIELDS.map(({ field, label }) => [field, label])
+);
 
 interface NewPatientFormProps {
     onSubmit: (data: Omit<Patient, 'id'>) => void;
@@ -43,10 +48,21 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
 }) => {
     const [formData, setFormData] = useState<Omit<Patient, 'id'>>(initialData || DEFAULT_FORM_DATA);
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+    const [errors, setErrors] = useState<Set<keyof Omit<Patient, 'id'>>>(new Set());
+
+    const clearError = (field: keyof Omit<Patient, 'id'>) => {
+        setErrors(prev => {
+            if (!prev.has(field)) return prev;
+            const next = new Set(prev);
+            next.delete(field);
+            return next;
+        });
+    };
 
     const handleChange = (field: keyof Omit<Patient, 'id'>, value: string) => {
         const upperValue = value.toUpperCase();
         setFormData(prev => ({ ...prev, [field]: upperValue }));
+        clearError(field);
 
         if (field === 'applicationPlace' && upperValue === HOSP_MEXICO) {
             setIsTransferModalOpen(true);
@@ -70,21 +86,42 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                 specialty: selectedName === '' ? '' : prev.specialty
             }));
         }
+        clearError('prescriber');
+        clearError('specialty');
     };
 
     const handleDateChange = (field: keyof Omit<Patient, 'id'>, value: string) => {
         const formattedValue = formatDateMMYYYY(value);
         setFormData(prev => ({ ...prev, [field]: formattedValue }));
+        clearError(field);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const missing = validatePatientForm(formData);
+        if (missing.length > 0) {
+            setErrors(new Set(missing));
+            return;
+        }
+        setErrors(new Set());
         onSubmit(formData);
     };
 
     return (
         <div className="p-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} noValidate className="space-y-6">
+
+                {errors.size > 0 && (
+                    <div role="alert" className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm flex gap-2">
+                        <AlertTriangle size={18} className="flex-shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-bold mb-1">Complete los campos obligatorios:</p>
+                            <p className="text-xs">
+                                {Array.from(errors).map((f) => FIELD_LABELS[f] ?? f).join(', ')}
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {/* Sección: Identificación del Paciente */}
                 <div className="space-y-4">
@@ -96,6 +133,7 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                         placeholder="0-0000-0000"
                         icon={FileText}
                         required
+                        error={errors.has('identificationNumber')}
                     />
                     <CorporateInput
                         label="Nombre Completo"
@@ -104,6 +142,7 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                         placeholder="Nombre y Apellidos"
                         icon={Users}
                         required
+                        error={errors.has('name')}
                     />
                 </div>
 
@@ -116,6 +155,7 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                         value={formData.diagnosis}
                         onChange={(e) => handleChange('diagnosis', e.target.value)}
                         placeholder="Descripción"
+                        error={errors.has('diagnosis')}
                     />
 
                     <div className="grid grid-cols-2 gap-4">
@@ -125,6 +165,7 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                             onChange={(e) => handleChange('authorizationCode', e.target.value)}
                             placeholder="Código"
                             icon={ShieldPlus}
+                            error={errors.has('authorizationCode')}
                         />
 
                         <div className="space-y-1.5">
@@ -133,7 +174,8 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                             </label>
                             <div className="relative">
                                 <select
-                                    className="w-full bg-white text-slate-900 p-3 rounded-lg border border-slate-300 focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 outline-none appearance-none font-medium"
+                                    aria-invalid={errors.has('issuer') || undefined}
+                                    className={`w-full bg-white text-slate-900 p-3 rounded-lg border outline-none appearance-none font-medium ${errors.has('issuer') ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-slate-300 focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700'}`}
                                     value={formData.issuer}
                                     onChange={(e) => handleChange('issuer', e.target.value)}
                                 >
@@ -159,6 +201,7 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                             onChange={(e) => handleDateChange('startMonth', e.target.value)}
                             placeholder="MM/AAAA"
                             maxLength={7}
+                            error={errors.has('startMonth')}
                         />
                         <CorporateInput
                             label="Mes Finalización"
@@ -166,6 +209,7 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                             onChange={(e) => handleDateChange('endMonth', e.target.value)}
                             placeholder="MM/AAAA"
                             maxLength={7}
+                            error={errors.has('endMonth')}
                         />
                     </div>
 
@@ -175,18 +219,21 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                             value={formData.dose}
                             onChange={(e) => handleChange('dose', e.target.value)}
                             placeholder="Cant."
+                            error={errors.has('dose')}
                         />
                         <CorporateInput
                             label="Frecuencia"
                             value={formData.frequency}
                             onChange={(e) => handleChange('frequency', e.target.value)}
                             placeholder="Ej: 8h"
+                            error={errors.has('frequency')}
                         />
                         <CorporateInput
                             label="Vía Adm."
                             value={formData.route}
                             onChange={(e) => handleChange('route', e.target.value)}
                             placeholder="Oral/IV"
+                            error={errors.has('route')}
                         />
                     </div>
 
@@ -196,12 +243,14 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                             value={formData.totalCycles}
                             onChange={(e) => handleChange('totalCycles', e.target.value)}
                             placeholder="#"
+                            error={errors.has('totalCycles')}
                         />
                         <CorporateInput
                             label="Total Meses"
                             value={formData.totalMonths}
                             onChange={(e) => handleChange('totalMonths', e.target.value)}
                             placeholder="#"
+                            error={errors.has('totalMonths')}
                         />
                     </div>
                 </div>
@@ -216,7 +265,8 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                         </label>
                         <div className="relative">
                             <select
-                                className="w-full bg-white text-slate-900 p-3 rounded-lg border border-slate-300 focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 outline-none appearance-none font-medium"
+                                aria-invalid={errors.has('applicationPlace') || undefined}
+                                className={`w-full bg-white text-slate-900 p-3 rounded-lg border outline-none appearance-none font-medium ${errors.has('applicationPlace') ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-slate-300 focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700'}`}
                                 value={formData.applicationPlace}
                                 onChange={(e) => handleChange('applicationPlace', e.target.value)}
                             >
@@ -245,7 +295,8 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                             </label>
                             <div className="relative">
                                 <select
-                                    className="w-full bg-white text-slate-900 p-3 rounded-lg border border-slate-300 focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700 outline-none appearance-none font-medium"
+                                    aria-invalid={errors.has('prescriber') || undefined}
+                                    className={`w-full bg-white text-slate-900 p-3 rounded-lg border outline-none appearance-none font-medium ${errors.has('prescriber') ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500' : 'border-slate-300 focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700'}`}
                                     value={formData.prescriber}
                                     onChange={handlePrescriberChange}
                                 >
@@ -264,6 +315,7 @@ export const NewPatientForm: React.FC<NewPatientFormProps> = ({
                             value={formData.specialty}
                             onChange={(e) => handleChange('specialty', e.target.value)}
                             placeholder="Ej: Onco"
+                            error={errors.has('specialty')}
                         />
                     </div>
                 </div>

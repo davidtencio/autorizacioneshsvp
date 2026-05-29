@@ -1,7 +1,7 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { Users, AlertTriangle, Activity, Stethoscope, Truck } from 'lucide-react';
 import type { Medication, Patient } from '../types';
-import { isAuthorizationExpired } from '../utils/statusUtils';
+import { isAuthorizationExpired, parseMonthYear } from '../utils/statusUtils';
 import { isHospitalMexico } from '../utils/constants';
 import { ExpiringPatientsModal } from './ExpiringPatientsModal';
 import { PendingTransfersModal } from './PendingTransfersModal';
@@ -76,25 +76,20 @@ export const KPIStats: React.FC<KPIStatsProps> = ({ medications }) => {
                         pendingTransfersMap.set(med.id, existing);
                     }
 
-                    // Expiring Soon Logic
-                    if (patient.endMonth && patient.endMonth.length === 7) {
-                        const [mStr, yStr] = patient.endMonth.split('/');
-                        const m = parseInt(mStr, 10);
-                        const y = parseInt(yStr, 10);
+                    // Expiring Soon Logic (tolerates MM/YYYY and legacy MMYYYY)
+                    const parsedEnd = parseMonthYear(patient.endMonth);
+                    if (parsedEnd) {
+                        const isExpired = isAuthorizationExpired(patient.endMonth);
+                        const dateValue = parsedEnd.year * 12 + parsedEnd.month;
+                        const currentValue = currentYear * 12 + currentMonth;
 
-                        if (!isNaN(m) && !isNaN(y)) {
-                            const isExpired = isAuthorizationExpired(patient.endMonth);
-                            const dateValue = y * 12 + m;
-                            const currentValue = currentYear * 12 + currentMonth;
-
-                            // Include if expires this month, next month, OR is already expired (and active)
-                            if (dateValue === currentValue || dateValue === currentValue + 1 || isExpired) {
-                                expiringList.push({
-                                    patient,
-                                    medicationName: med.name,
-                                    isExpired
-                                });
-                            }
+                        // Include if expires this month, next month, OR is already expired (and active)
+                        if (dateValue === currentValue || dateValue === currentValue + 1 || isExpired) {
+                            expiringList.push({
+                                patient,
+                                medicationName: med.name,
+                                isExpired
+                            });
                         }
                     }
                 }
@@ -168,8 +163,17 @@ export const KPIStats: React.FC<KPIStatsProps> = ({ medications }) => {
 
                 {/* Expiring Soon */}
                 <div
+                    role={stats.expiringList.length > 0 ? 'button' : undefined}
+                    tabIndex={stats.expiringList.length > 0 ? 0 : undefined}
+                    aria-label={stats.expiringList.length > 0 ? 'Ver lista de autorizaciones por vencer' : undefined}
                     onClick={() => stats.expiringList.length > 0 && setIsExpiringModalOpen(true)}
-                    className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between relative overflow-hidden group hover:border-amber-300 transition-colors ${stats.expiringList.length > 0 ? 'cursor-pointer hover:shadow-md' : ''}`}
+                    onKeyDown={(e) => {
+                        if (stats.expiringList.length > 0 && (e.key === 'Enter' || e.key === ' ')) {
+                            e.preventDefault();
+                            setIsExpiringModalOpen(true);
+                        }
+                    }}
+                    className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between relative overflow-hidden group hover:border-amber-300 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 ${stats.expiringList.length > 0 ? 'cursor-pointer hover:shadow-md' : ''}`}
                 >
                     <div className="absolute right-0 top-0 h-full w-1 bg-amber-400"></div>
                     <div>
@@ -211,8 +215,17 @@ export const KPIStats: React.FC<KPIStatsProps> = ({ medications }) => {
 
                 {/* Pending Transfers to Hosp. Mexico */}
                 <div
+                    role={stats.pendingTransfers.length > 0 ? 'button' : undefined}
+                    tabIndex={stats.pendingTransfers.length > 0 ? 0 : undefined}
+                    aria-label={stats.pendingTransfers.length > 0 ? 'Ver saldos pendientes a Hospital México' : undefined}
                     onClick={() => stats.pendingTransfers.length > 0 && setIsPendingTransfersModalOpen(true)}
-                    className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between relative overflow-hidden group hover:border-cyan-300 transition-colors ${stats.pendingTransfers.length > 0 ? 'cursor-pointer hover:shadow-md' : ''}`}
+                    onKeyDown={(e) => {
+                        if (stats.pendingTransfers.length > 0 && (e.key === 'Enter' || e.key === ' ')) {
+                            e.preventDefault();
+                            setIsPendingTransfersModalOpen(true);
+                        }
+                    }}
+                    className={`bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between relative overflow-hidden group hover:border-cyan-300 transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400 ${stats.pendingTransfers.length > 0 ? 'cursor-pointer hover:shadow-md' : ''}`}
                 >
                     <div className="absolute right-0 top-0 h-full w-1 bg-cyan-400"></div>
                     <div>
