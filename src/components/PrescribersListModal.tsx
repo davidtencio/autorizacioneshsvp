@@ -1,7 +1,6 @@
 
 import React from 'react';
-import { useAuth } from '../hooks/useAuth';
-import { canEdit } from '../utils/permissions';
+import { useCanEdit } from '../hooks/useCanEdit';
 import { User, Plus, Pencil, Trash2 } from 'lucide-react';
 import { Skeleton } from './ui/Skeleton';
 import type { Prescriber } from '../types';
@@ -15,8 +14,7 @@ interface PrescribersListModalProps {
 }
 
 export const PrescribersListModal: React.FC<PrescribersListModalProps> = ({ prescribers, loading = false, onAddPrescriber, onEdit, onDelete }) => {
-    const { user } = useAuth();
-    const isEditable = canEdit(user);
+    const isEditable = useCanEdit();
     return (
         <div className="flex flex-col h-[60vh] max-h-[500px]">
             {/* List Container */}

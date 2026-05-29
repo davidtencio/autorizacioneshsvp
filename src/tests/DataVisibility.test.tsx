@@ -42,6 +42,11 @@ vi.mock('../hooks/useAuth', () => ({
 
 vi.mock('../utils/permissions', () => ({
     canEdit: () => true,
+    canEditWithRole: () => true,
+}));
+
+vi.mock('../hooks/useCanEdit', () => ({
+    useCanEdit: () => true,
 }));
 
 describe('Data Visibility Regression Test', () => {

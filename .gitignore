@@ -11,6 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.development
+.env.production
+.env.local
+!.env.example
 .firebase/
 
 # Editor directories and files
@@ -24,3 +29,5 @@ dist-ssr
 *.sln
 *.sw?
 tmp_*.txt
+tmp_*.tsv
+tmp_*.json

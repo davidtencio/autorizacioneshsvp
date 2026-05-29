@@ -18,8 +18,8 @@ vi.mock('../context/UIContext', () => ({
     })
 }));
 
-vi.mock('../utils/permissions', () => ({
-    canEdit: () => canEditMock()
+vi.mock('../hooks/useCanEdit', () => ({
+    useCanEdit: () => canEditMock()
 }));
 
 const basePatient = (overrides: Partial<Patient> = {}): Patient => ({
