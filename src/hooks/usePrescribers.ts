@@ -11,12 +11,11 @@ import {
     orderBy
 } from 'firebase/firestore';
 import type { Prescriber } from '../types';
+import { logger } from '../utils/logger';
 
 interface UsePrescribersOptions {
     enabled?: boolean;
 }
-
-const DEV_LOGS = import.meta.env.DEV;
 
 export const usePrescribers = ({ enabled = true }: UsePrescribersOptions = {}) => {
     const [prescribers, setPrescribers] = useState<Prescriber[]>([]);
@@ -38,7 +37,7 @@ export const usePrescribers = ({ enabled = true }: UsePrescribersOptions = {}) =
             setError(null);
             setLoading(false);
         }, (error) => {
-            if (DEV_LOGS) console.error("Error fetching prescribers:", error);
+            logger.error('prescribers_fetch_failed', { code: error.code, message: error.message });
             setError(`Error: ${error.message} (${error.code})`);
             setLoading(false);
         });
@@ -50,7 +49,7 @@ export const usePrescribers = ({ enabled = true }: UsePrescribersOptions = {}) =
         try {
             await addDoc(collection(db, 'prescribers'), prescriber);
         } catch (err) {
-            if (DEV_LOGS) console.error("Error adding prescriber:", err);
+            logger.error('prescriber_add_failed', { error: String(err) });
             throw err;
         }
     };
@@ -60,7 +59,7 @@ export const usePrescribers = ({ enabled = true }: UsePrescribersOptions = {}) =
             const docRef = doc(db, 'prescribers', String(id));
             await updateDoc(docRef, data);
         } catch (err) {
-            if (DEV_LOGS) console.error("Error updating prescriber:", err);
+            logger.error('prescriber_update_failed', { id: String(id), error: String(err) });
             throw err;
         }
     };
@@ -70,7 +69,7 @@ export const usePrescribers = ({ enabled = true }: UsePrescribersOptions = {}) =
             const docRef = doc(db, 'prescribers', String(id));
             await deleteDoc(docRef);
         } catch (err) {
-            if (DEV_LOGS) console.error("Error deleting prescriber:", err);
+            logger.error('prescriber_delete_failed', { id: String(id), error: String(err) });
             throw err;
         }
     };

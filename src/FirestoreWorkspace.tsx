@@ -18,6 +18,7 @@ import { useDebouncedValue } from './hooks/useDebouncedValue';
 import { db } from './firebase/firestore';
 import { writeBatch, doc } from 'firebase/firestore';
 import { buildPatientsSummary, fetchPatientsByMedication } from './services/patientStore';
+import { tracedCommit } from './services/tracedCommit';
 import { logger } from './utils/logger';
 
 export const FirestoreWorkspace = () => {
@@ -89,7 +90,7 @@ export const FirestoreWorkspace = () => {
               patientsSummary: buildPatientsSummary(updatedPatients),
             });
 
-            await batch.commit();
+            await tracedCommit('deletePatient', batch, { medId: medKey, patientId: String(deleteTarget.id) });
             addToast('Paciente eliminado', 'success');
           } catch (err) {
             setPatientsByMedication((prev) => ({ ...prev, [medKey]: previousPatients }));
@@ -101,7 +102,7 @@ export const FirestoreWorkspace = () => {
         addToast('Prescriptor eliminado', 'success');
       }
     } catch (err) {
-      console.error('Error deleting:', err);
+      logger.error('delete_failed', { target: deleteTarget?.type, id: deleteTarget?.id, error: String(err) });
       addToast('Error al eliminar', 'error');
     }
     setIsDeleteModalOpen(false);
@@ -131,7 +132,7 @@ export const FirestoreWorkspace = () => {
             patientsSummary: buildPatientsSummary(updatedPatients),
           });
 
-          await batch.commit();
+          await tracedCommit('upsertPatient', batch, { medId: medKey, patientId: String(targetPatient.id), action });
         }
       } catch (err) {
         setPatientsByMedication((prev) => ({ ...prev, [medKey]: previousPatients }));
@@ -168,7 +169,7 @@ export const FirestoreWorkspace = () => {
             patientsSummary: buildPatientsSummary(updated),
           });
 
-          await batch.commit();
+          await tracedCommit('suspendPatient', batch, { medId: medKey, patientId: String(suspended.id), reason });
         }
       } catch (err) {
         setPatientsByMedication((prev) => ({ ...prev, [medKey]: previousPatients }));

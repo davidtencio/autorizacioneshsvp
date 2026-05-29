@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { reportWebVitals } from './monitoring/webVitals.ts'
+import { installGlobalErrorHandlers } from './monitoring/globalErrorHandlers.ts'
 import { RootErrorBoundary } from './components/RootErrorBoundary.tsx'
+
+installGlobalErrorHandlers()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

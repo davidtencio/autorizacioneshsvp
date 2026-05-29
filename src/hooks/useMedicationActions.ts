@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import type { Medication } from '../types';
+import { logger } from '../utils/logger';
 
 interface DeleteTargetSetter {
     (target: { type: 'medication'; id: number | string; name: string } | null): void;
@@ -59,7 +60,7 @@ export const useMedicationActions = ({
             setIsMedModalOpen(false);
             setEditingId(null);
         } catch (error) {
-            console.error(error);
+            logger.error('save_medication_failed', { editingId, error: String(error) });
             addToast('Error al guardar medicamento', 'error');
         }
     }, [editingId, updateMedication, addMedication, addToast, setIsMedModalOpen, setEditingId]);

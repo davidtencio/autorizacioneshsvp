@@ -3,6 +3,7 @@ import React, { createContext, useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../firebase/auth';
+import { logger, setLoggerUid } from '../utils/logger';
 
 interface AuthContextType {
     user: User | null;
@@ -24,6 +25,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
+            setLoggerUid(currentUser?.uid ?? null);
             setLoading(false);
         });
 
@@ -34,8 +36,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             await signOut(auth);
             setUser(null); // Ensure local state is cleared
+            setLoggerUid(null);
         } catch (error) {
-            console.error("Error logging out:", error);
+            logger.error('logout_failed', { error: String(error) });
         }
     };
 

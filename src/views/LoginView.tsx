@@ -2,6 +2,7 @@
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import { logger } from '../utils/logger';
 
 export const LoginView: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -19,8 +20,8 @@ export const LoginView: React.FC = () => {
             await signInWithEmailAndPassword(auth, email, password);
             navigate('/');
         } catch (err: unknown) {
-            console.error('Login error:', err);
             const firebaseError = err as { code?: string };
+            logger.warn('login_failed', { code: firebaseError.code });
             if (firebaseError.code === 'auth/invalid-credential') {
                 setError('Credenciales incorrectas. Verifique su correo y contraseña.');
             } else if (firebaseError.code === 'auth/user-not-found') {

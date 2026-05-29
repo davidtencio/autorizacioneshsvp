@@ -1,5 +1,10 @@
 import { useCallback, useMemo } from 'react';
 import type { Prescriber } from '../types';
+import { logger } from '../utils/logger';
+
+interface FirebaseLikeError {
+  code?: string;
+}
 
 interface DeleteTargetSetter {
     (target: { type: 'prescriber'; id: number | string; name: string } | null): void;
@@ -50,9 +55,9 @@ export const usePrescriberActions = ({
             setIsPrescriberModalOpen(false);
             setIsPrescribersListOpen(true);
         } catch (error) {
-            console.error('Error detailed when adding prescriber:', error);
-            // @ts-expect-error - Firebase error typing is loose
-            if (error?.code === 'permission-denied') {
+            const code = (error as FirebaseLikeError)?.code;
+            logger.error('save_prescriber_failed', { editingPrescriberId, code, error: String(error) });
+            if (code === 'permission-denied') {
                 addToast('Permisos insuficientes para agregar prescriptor', 'error');
             } else {
                 addToast('Error al agregar prescriptor', 'error');

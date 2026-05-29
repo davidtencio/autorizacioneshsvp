@@ -15,12 +15,12 @@ import {
     type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import type { Medication } from '../types';
+import { logger } from '../utils/logger';
 
 interface UseMedicationsOptions {
     enabled?: boolean;
 }
 
-const DEV_LOGS = import.meta.env.DEV;
 const PAGE_SIZE = 30;
 
 const mapMedication = (snapshotDoc: QueryDocumentSnapshot<unknown>): Medication => {
@@ -29,8 +29,12 @@ const mapMedication = (snapshotDoc: QueryDocumentSnapshot<unknown>): Medication 
 
     if (Array.isArray(data.patients)) {
         patients = data.patients;
-    } else if (data.patients && DEV_LOGS) {
-        console.warn(`Medication ${snapshotDoc.id} (${data.name}) has invalid 'patients' format (expected Array):`, data.patients);
+    } else if (data.patients) {
+        logger.warn('medication_invalid_patients_field', {
+            medId: snapshotDoc.id,
+            name: data.name,
+            typeofPatients: typeof data.patients,
+        });
     }
 
     return {
@@ -90,7 +94,7 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
             },
             (err) => {
                 if (!active) return;
-                if (DEV_LOGS) console.error('Error fetching medications:', err);
+                logger.error('medications_listen_failed', { code: err.code, message: err.message });
                 setError(`Error: ${err.message} (${err.code})`);
                 setLoading(false);
             }
@@ -104,7 +108,7 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
                     q = fallbackQuery;
                 }
             } catch (err) {
-                if (DEV_LOGS) console.warn('Ordered query failed, falling back to unordered', err);
+                logger.warn('medications_ordered_query_failed_fallback', { error: String(err) });
                 q = fallbackQuery;
             }
 
@@ -118,7 +122,6 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
                 const snap = await getDocs(q);
                 if (!active) return;
                 if (receivedSnapshot) {
-                    if (DEV_LOGS) console.log('Snapshot already received data, skipping HTTP hydration');
                     return;
                 }
                 const firstPage = snap.docs.map(mapMedication);
@@ -129,7 +132,7 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
                 setLoading(false);
             } catch (err) {
                 if (!active) return;
-                if (DEV_LOGS) console.error('Initial hydration failed:', err);
+                logger.warn('medications_hydration_failed', { error: String(err) });
             }
         };
 
@@ -161,8 +164,8 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
             setLimitCount((prev) => prev + nextMeds.length);
             setError(null);
         } catch (err) {
-            if (DEV_LOGS) console.error('Error loading more medications:', err);
             const e = err as { message?: string; code?: string };
+            logger.error('medications_load_more_failed', { code: e.code, message: e.message });
             if (!mountedRef.current) return;
             setError(`Error: ${e.message ?? 'Error inesperado'} (${e.code ?? 'unknown'})`);
         } finally {
@@ -176,7 +179,7 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
         try {
             await addDoc(collection(db, 'medications'), med);
         } catch (err) {
-            if (DEV_LOGS) console.error('Error adding medication:', err);
+            logger.error('medication_add_failed', { error: String(err) });
             throw err;
         }
     };
@@ -186,7 +189,7 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
             const medRef = doc(db, 'medications', String(id));
             await updateDoc(medRef, updates);
         } catch (err) {
-            if (DEV_LOGS) console.error('Error updating medication:', err);
+            logger.error('medication_update_failed', { id: String(id), error: String(err) });
             throw err;
         }
     };
@@ -195,7 +198,7 @@ export const useMedications = ({ enabled = true }: UseMedicationsOptions = {}) =
         try {
             await deleteDoc(doc(db, 'medications', String(id)));
         } catch (err) {
-            if (DEV_LOGS) console.error('Error deleting medication:', err);
+            logger.error('medication_delete_failed', { id: String(id), error: String(err) });
             throw err;
         }
     };
